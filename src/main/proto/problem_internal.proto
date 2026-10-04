@@ -1,0 +1,42 @@
+// Internal API of problem-service, called by the submission side (judge-api, later submission-service).
+// Port 9090, oj-net only; every call carries the service token (ServiceToken.HEADER).
+syntax = "proto3";
+
+package oj.problem.v1;
+
+option java_package = "vn.thanhtuanle.oj.common.grpc.problem.v1";
+option java_multiple_files = true;
+
+service ProblemInternal {
+  // NOT_FOUND: unknown or deleted slug. FAILED_PRECONDITION: no test-case bundle published.
+  rpc GetJudgeSpec(GetJudgeSpecRequest) returns (JudgeSpec);
+  // Sample test cases only; hidden contents never leave problem-service. Unknown id: empty list.
+  // Deleted problems included, so old submissions stay readable.
+  rpc GetSampleTestCases(GetSampleTestCasesRequest) returns (SampleTestCases);
+}
+
+message GetJudgeSpecRequest {
+  string problem_slug = 1;
+}
+
+message JudgeSpec {
+  string problem_id = 1;
+  string problem_slug = 2;
+  int32 time_limit_ms = 3;
+  int64 memory_limit_mb = 4;
+  string test_case_version = 5; // CURRENT bundle hash
+}
+
+message GetSampleTestCasesRequest {
+  string problem_id = 1;
+}
+
+message SampleTestCases {
+  repeated SampleTestCase cases = 1;
+}
+
+message SampleTestCase {
+  string name = 1; // the judge's name for it: the file stem, e.g. "1"
+  string input = 2;
+  string expected_output = 3;
+}

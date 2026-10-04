@@ -12,12 +12,27 @@
 	</parent>
 	<groupId>vn.thanhtuanle</groupId>
 	<artifactId>oj-common</artifactId>
-	<version>0.1.0</version>
+	<version>0.2.0</version>
 	<name>oj-common</name>
 	<description>Code shared by the My Online Judge services</description>
 	<properties>
 		<java.version>17</java.version>
+		<!-- The versions Spring gRPC 0.12.0 (the last line on Boot 3.5) manages: the services get gRPC
+		     through its starters, and the stubs generated here must match that runtime. -->
+		<grpc.version>1.76.0</grpc.version>
+		<protobuf-java.version>4.32.1</protobuf-java.version>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>io.grpc</groupId>
+				<artifactId>grpc-bom</artifactId>
+				<version>${grpc.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -40,6 +55,24 @@
 			<artifactId>spring-security-web</artifactId>
 			<optional>true</optional>
 		</dependency>
+		<!-- Optional: the generated problem-service stubs and the service-token interceptors. Only the
+		     services that speak gRPC need them; the gateway does not. -->
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-protobuf</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-stub</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java</artifactId>
+			<version>${protobuf-java.version}</version>
+			<optional>true</optional>
+		</dependency>
 		<dependency>
 			<groupId>jakarta.servlet</groupId>
 			<artifactId>jakarta.servlet-api</artifactId>
@@ -55,5 +88,39 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-inprocess</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
+	<build>
+		<plugins>
+			<!-- Generates the messages and stubs from src/main/proto. It downloads protoc and the grpc-java
+			     plugin, which are glibc binaries: Docker builds use a Debian-based Maven image, not Alpine. -->
+			<plugin>
+				<groupId>io.github.ascopes</groupId>
+				<artifactId>protobuf-maven-plugin</artifactId>
+				<version>5.1.11</version>
+				<configuration>
+					<protoc>${protobuf-java.version}</protoc>
+					<plugins>
+						<plugin kind="binary-maven">
+							<groupId>io.grpc</groupId>
+							<artifactId>protoc-gen-grpc-java</artifactId>
+							<version>${grpc.version}</version>
+							<options>@generated=omit</options>
+						</plugin>
+					</plugins>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 </project>
