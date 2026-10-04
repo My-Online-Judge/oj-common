@@ -28,6 +28,14 @@ class OjExceptionHandlerTest {
     private final OjExceptionHandler handler = new OjExceptionHandler();
 
     @Test
+    void aCodeIsKnownByItsNameThroughTheInterface() {
+        // identity-service records a failed login's reason as the code's name.
+        ErrorCodeSpec code = new AppException(TestCode.AWAY).getErrorCode();
+
+        assertThat(code.name()).isEqualTo("AWAY");
+    }
+
+    @Test
     void anAppExceptionAnswersWithItsCodesStatusAndMessage() {
         var response = handler.handleAppException(new AppException(TestCode.AWAY));
 

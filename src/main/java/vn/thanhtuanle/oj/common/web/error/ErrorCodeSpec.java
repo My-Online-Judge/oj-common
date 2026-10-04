@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
  */
 public interface ErrorCodeSpec {
 
+    /** The code's identifier (e.g. {@code RATE_LIMITED}); an enum provides it. */
+    String name();
+
     String getMessage();
 
     HttpStatus getStatusCode();
