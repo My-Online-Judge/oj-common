@@ -7,6 +7,10 @@ Code shared by the My Online Judge services.
   service-token interceptors every internal call goes through.
 - `security`, `client`, `redis` — JWT verification through JWKS, `CurrentUser`, client fingerprints,
   shared Redis keys.
+- `web` — what every servlet service answers with: the `ApiResponse` envelope (`payload`), the error
+  infrastructure (`error`: `ErrorCodeSpec`, which each service's `ErrorCode` enum implements, the exceptions and
+  the `OjExceptionHandler` base a service extends with `@RestControllerAdvice`), the JSON 401/403 handlers and
+  the request log (registered by `OjWebAutoConfiguration`, servlet only).
 
 Build with `./mvnw` (Maven 3.9.9): the protobuf plugin needs Maven ≥ 3.9.6 and runs glibc binaries
 (protoc, protoc-gen-grpc-java), so Docker builds use `maven:3.9-eclipse-temurin-17`, not the Alpine image.

@@ -12,7 +12,7 @@
 	</parent>
 	<groupId>vn.thanhtuanle</groupId>
 	<artifactId>oj-common</artifactId>
-	<version>0.2.0</version>
+	<version>0.3.0</version>
 	<name>oj-common</name>
 	<description>Code shared by the My Online Judge services</description>
 	<properties>
@@ -78,6 +78,33 @@
 			<artifactId>jakarta.servlet-api</artifactId>
 			<scope>provided</scope>
 		</dependency>
+		<!-- Optional: the response envelope, the error infrastructure and the request log (package web) that
+		     every servlet service shares. The WebFlux gateway uses none of it and must not get the servlet stack. -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-commons</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -96,6 +123,19 @@
 	</dependencies>
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
 			<!-- Generates the messages and stubs from src/main/proto. It downloads protoc and the grpc-java
 			     plugin, which are glibc binaries: Docker builds use a Debian-based Maven image, not Alpine. -->
 			<plugin>
