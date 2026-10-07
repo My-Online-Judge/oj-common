@@ -3,6 +3,7 @@ package vn.thanhtuanle.oj.common.redis;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.resource.Delay;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.data.redis.ClientResourcesBuilderCustomizer;
@@ -18,7 +19,10 @@ import java.util.concurrent.TimeUnit;
  * command sent while it is disconnected and holds it until the command timeout, and waits up to 30 s between
  * reconnect attempts: a stopped Redis cost every request a timeout, and a returned one went unused for up to half a
  * minute. Here a command sent while disconnected fails at once, so the caller's fail-open path runs without waiting,
- * and reconnect attempts are at most a second apart. Boot's own client options (its timeouts) are kept.
+ * and reconnect attempts are at most a second apart. Boot's own client options (its timeouts) are kept. Redis's name
+ * is resolved by the JDK, so the JVM's DNS cache policy (1 s; failed lookups not cached) applies: with
+ * netty-resolver-dns on the classpath, as in the gateway, Lettuce would otherwise use Netty's resolver and keep a
+ * container's old address for Docker DNS's 600 s TTL.
  */
 @AutoConfiguration
 @ConditionalOnClass({RedisClient.class, LettuceClientConfiguration.class})
@@ -39,8 +43,9 @@ public class RedisResilienceAutoConfiguration {
     }
 
     @Bean
-    ClientResourcesBuilderCustomizer ojShortReconnectDelay() {
-        return builder -> builder.reconnectDelay(
-                Delay.exponential(Duration.ZERO, MAX_RECONNECT_DELAY, 2, TimeUnit.MILLISECONDS));
+    ClientResourcesBuilderCustomizer ojReconnectQuicklyToTheCurrentAddress() {
+        return builder -> builder
+                .reconnectDelay(Delay.exponential(Duration.ZERO, MAX_RECONNECT_DELAY, 2, TimeUnit.MILLISECONDS))
+                .addressResolverGroup(DefaultAddressResolverGroup.INSTANCE);
     }
 }

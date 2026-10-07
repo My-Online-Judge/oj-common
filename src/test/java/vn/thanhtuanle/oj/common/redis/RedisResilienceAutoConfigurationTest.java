@@ -5,6 +5,7 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.SocketOptions;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.Delay;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -52,6 +53,22 @@ class RedisResilienceAutoConfigurationTest {
                 Delay delay = resources.reconnectDelay();
                 assertThat(delay.createDelay(1)).isLessThan(Duration.ofSeconds(1));
                 assertThat(delay.createDelay(30)).isEqualTo(Duration.ofSeconds(1));
+            } finally {
+                resources.shutdown();
+            }
+        });
+    }
+
+    @Test
+    void lettuceResolvesRedisThroughTheJdkSoTheJvmsDnsCachePolicyApplies() {
+        // With netty-resolver-dns on the classpath (the gateway's case) Lettuce would pick Netty's resolver, which
+        // keeps an answer for its DNS TTL: Docker's 600 s (final review I1).
+        runner.run(context -> {
+            ClientResources.Builder builder = ClientResources.builder();
+            context.getBean(ClientResourcesBuilderCustomizer.class).customize(builder);
+            ClientResources resources = builder.build();
+            try {
+                assertThat(resources.addressResolverGroup()).isSameAs(DefaultAddressResolverGroup.INSTANCE);
             } finally {
                 resources.shutdown();
             }

@@ -130,6 +130,12 @@
 			<artifactId>grpc-inprocess</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<!-- On the gateway's classpath (reactor-netty): with it Lettuce picks Netty's caching DNS resolver. -->
+			<groupId>io.netty</groupId>
+			<artifactId>netty-resolver-dns</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
