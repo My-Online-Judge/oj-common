@@ -1,2 +1,3 @@
 vn.thanhtuanle.oj.common.security.OjJwtAuthAutoConfiguration
 vn.thanhtuanle.oj.common.web.OjWebAutoConfiguration
+vn.thanhtuanle.oj.common.redis.RedisResilienceAutoConfiguration
