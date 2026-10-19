@@ -9,6 +9,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import vn.thanhtuanle.oj.common.web.payload.ApiResponse;
 
 import java.util.HashMap;
@@ -98,11 +101,23 @@ public class OjExceptionHandler {
                 .body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
     }
 
+    /**
+     * Spring Security throws AccessDeniedException (AuthorizationDeniedException) from @PreAuthorize for an anonymous
+     * caller too. That caller is unauthenticated, so answer 401 with the body OjAuthenticationEntryPoint writes: the
+     * portal refreshes the session on 401 only. An authenticated caller lacking the permission still gets 403.
+     */
     @ExceptionHandler(AccessDeniedException.class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
-    public ApiResponse<Object> handleAccessDeniedException(
-            AccessDeniedException ex) {
+    public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(AccessDeniedException ex) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication instanceof AnonymousAuthenticationToken
+                || !authentication.isAuthenticated()) {
+            log.warn("Unauthenticated request denied: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(
+                    HttpStatus.UNAUTHORIZED.value(),
+                    "Unauthorized: Full authentication is required to access this resource"));
+        }
         log.error("Access Denied: ", ex);
-        return ApiResponse.error(HttpStatus.FORBIDDEN.value(), "Access Denied: " + ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(HttpStatus.FORBIDDEN.value(), "Access Denied: " + ex.getMessage()));
     }
 }

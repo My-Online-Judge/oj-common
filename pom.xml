@@ -12,7 +12,7 @@
 	</parent>
 	<groupId>vn.thanhtuanle</groupId>
 	<artifactId>oj-common</artifactId>
-	<version>0.4.0</version>
+	<version>0.4.1</version>
 	<name>oj-common</name>
 	<description>Code shared by the My Online Judge services</description>
 	<properties>

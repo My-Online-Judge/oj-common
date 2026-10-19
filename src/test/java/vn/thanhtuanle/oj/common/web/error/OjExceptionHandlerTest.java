@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -80,11 +83,14 @@ class OjExceptionHandlerTest {
 
     @Test
     void accessDeniedIs403AndAnythingElse500() {
-        assertThat(handler.handleAccessDeniedException(new AccessDeniedException("no")).getMessage())
+        SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                "alice", "n/a", AuthorityUtils.createAuthorityList("x")));
+        assertThat(handler.handleAccessDeniedException(new AccessDeniedException("no")).getBody().getMessage())
                 .isEqualTo("Access Denied: no");
         assertThat(handler.handleGlobalException(new IllegalStateException("boom")))
                 .satisfies(b -> assertThat(b.getStatus()).isEqualTo(500))
                 .satisfies(b -> assertThat(b.getMessage()).isEqualTo("Internal Server Error: boom"));
+        SecurityContextHolder.clearContext();
     }
 
     @SuppressWarnings("unused")
