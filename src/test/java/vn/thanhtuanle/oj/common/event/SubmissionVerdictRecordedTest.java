@@ -40,7 +40,7 @@ class SubmissionVerdictRecordedTest {
                 + "\"version\":1,"
                 + "\"occurredAt\":\"2026-10-03T10:00:00Z\","
                 + "\"payload\":{\"submissionId\":\"00000000-0000-0000-0000-000000000001\","
-                + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":0}}");
+                + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":0,\"rejudge\":false}}");
     }
 
     @Test
@@ -54,5 +54,32 @@ class SubmissionVerdictRecordedTest {
         assertThat(received).isEqualTo(sent);
         assertThat(received.eventType()).isEqualTo("SubmissionVerdictRecorded");
         assertThat(received.version()).isEqualTo(1);
+    }
+
+    @Test
+    void aRejudgeRoundTrips() throws Exception {
+        EventEnvelope<SubmissionVerdictRecorded> sent = new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, -1, true)
+                .toEnvelope();
+
+        EventEnvelope<SubmissionVerdictRecorded> received = mapper.readValue(mapper.writeValueAsBytes(sent),
+                new TypeReference<EventEnvelope<SubmissionVerdictRecorded>>() { });
+
+        assertThat(received).isEqualTo(sent);
+        assertThat(received.payload().rejudge()).isTrue();
+    }
+
+    @Test
+    void anEventFromAnOlderProducerReadsAsFirstVerdict() throws Exception {
+        String old = "{\"eventId\":\"00000000-0000-0000-0000-00000000000e\","
+                + "\"eventType\":\"SubmissionVerdictRecorded\",\"version\":1,"
+                + "\"occurredAt\":\"2026-10-03T10:00:00Z\","
+                + "\"payload\":{\"submissionId\":\"00000000-0000-0000-0000-000000000001\","
+                + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":0}}";
+
+        EventEnvelope<SubmissionVerdictRecorded> received = mapper.readValue(old,
+                new TypeReference<EventEnvelope<SubmissionVerdictRecorded>>() { });
+
+        assertThat(received.payload().rejudge()).isFalse();
+        assertThat(received.payload()).isEqualTo(new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, 0));
     }
 }
