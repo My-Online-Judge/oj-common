@@ -11,6 +11,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
+import org.springframework.web.client.RestOperations;
+
 import java.util.Objects;
 
 /** How every OJ service decodes the access tokens identity issues. */
@@ -34,11 +36,23 @@ public final class OjJwtDecoders {
         return fromJwksUri(jwksUri, new ConcurrentMapCache("oj-jwks"));
     }
 
+    /** Same as {@link #fromJwksUri(String)}, fetching the key set through {@code rest} (e.g. one presenting a client certificate). */
+    public static JwtDecoder fromJwksUri(String jwksUri, RestOperations rest) {
+        return build(jwksUri, rest, new ConcurrentMapCache("oj-jwks"));
+    }
+
     static JwtDecoder fromJwksUri(String jwksUri, Cache keySetCache) {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwksUri)
+        return build(jwksUri, null, keySetCache);
+    }
+
+    private static JwtDecoder build(String jwksUri, RestOperations rest, Cache keySetCache) {
+        NimbusJwtDecoder.JwkSetUriJwtDecoderBuilder builder = NimbusJwtDecoder.withJwkSetUri(jwksUri)
                 .jwsAlgorithm(SignatureAlgorithm.RS256)
-                .cache(keySetCache)
-                .build();
+                .cache(keySetCache);
+        if (rest != null) {
+            builder.restOperations(rest);
+        }
+        NimbusJwtDecoder decoder = builder.build();
         decoder.setJwtValidator(validator());
         return decoder;
     }

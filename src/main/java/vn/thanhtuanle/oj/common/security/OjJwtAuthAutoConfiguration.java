@@ -1,14 +1,19 @@
 package vn.thanhtuanle.oj.common.security;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.ssl.SslBundles;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * Wires JWT verification for a servlet service that sets {@code oj.security.jwt.jwks-uri}. The
@@ -25,7 +30,14 @@ public class OjJwtAuthAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public JwtDecoder ojJwtDecoder(OjJwtProperties properties) {
+    public JwtDecoder ojJwtDecoder(OjJwtProperties properties, ObjectProvider<SslBundles> sslBundles) {
+        if (StringUtils.hasText(properties.jwksSslBundle())) {
+            SslBundles bundles = sslBundles.getObject();
+            RestTemplate rest = new RestTemplateBuilder()
+                    .sslBundle(bundles.getBundle(properties.jwksSslBundle()))
+                    .build();
+            return OjJwtDecoders.fromJwksUri(properties.jwksUri(), rest);
+        }
         return OjJwtDecoders.fromJwksUri(properties.jwksUri());
     }
 
