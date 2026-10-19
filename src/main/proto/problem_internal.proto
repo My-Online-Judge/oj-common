@@ -1,5 +1,7 @@
 // Internal API of problem-service, called by the submission side (judge-api, later submission-service).
-// Port 9090, oj-net only; every call carries the service token (ServiceToken.HEADER).
+// Port 9090, oj-net only. Callers are authenticated by mutual TLS: the server requires a CA-signed client certificate and
+// admits only the peer CNs in oj.tls.grpc-allowed-clients (PeerIdentityServerInterceptor; PERMISSION_DENIED otherwise).
+// The service token (ServiceToken.HEADER) is optional and additive: when oj.rpc.token is set, every call must carry it too.
 syntax = "proto3";
 
 package oj.problem.v1;
