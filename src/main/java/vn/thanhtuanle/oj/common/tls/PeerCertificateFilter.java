@@ -23,10 +23,15 @@ public class PeerCertificateFilter extends OncePerRequestFilter implements Order
     static final String CERT_ATTRIBUTE = "jakarta.servlet.request.X509Certificate";
 
     private final Set<String> allowed;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public PeerCertificateFilter(Set<String> allowed) {
+        this(allowed, new ObjectMapper());
+    }
+
+    public PeerCertificateFilter(Set<String> allowed, ObjectMapper objectMapper) {
         this.allowed = Set.copyOf(allowed);
+        this.objectMapper = objectMapper;
     }
 
     @Override

@@ -74,4 +74,11 @@ class PeerIdentityServerInterceptorTest {
         interceptor.interceptCall(call, new Metadata(), next);
         assertDenied();
     }
+
+    @Test
+    void peerWithoutCnDenied() throws Exception {
+        attach(sessionOf("no-cn"));
+        interceptor.interceptCall(call, new Metadata(), next);
+        assertDenied();
+    }
 }

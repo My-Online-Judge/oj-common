@@ -1,5 +1,7 @@
 package vn.thanhtuanle.oj.common.tls;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -9,6 +11,7 @@ import java.security.cert.X509Certificate;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,11 +45,10 @@ class PeerCertificateFilterTest {
         filter.doFilter(requestWith("tls-probe"), response, chain);
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(response.getContentType()).startsWith("application/json");
-        com.fasterxml.jackson.databind.JsonNode body =
-                new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.getContentAsString());
+        JsonNode body = new ObjectMapper().readTree(response.getContentAsString());
         assertThat(body.get("status").asInt()).isEqualTo(403);
         assertThat(body.get("message").asText()).isEqualTo("Client certificate not allowed");
-        verify(chain, never()).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(chain, never()).doFilter(any(), any());
     }
 
     @Test
@@ -54,6 +56,14 @@ class PeerCertificateFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         filter.doFilter(requestWith(null), response, chain);
         assertThat(response.getStatus()).isEqualTo(403);
-        verify(chain, never()).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(chain, never()).doFilter(any(), any());
+    }
+
+    @Test
+    void certificateWithoutCnGets403() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(requestWith("no-cn"), response, chain);
+        assertThat(response.getStatus()).isEqualTo(403);
+        verify(chain, never()).doFilter(any(), any());
     }
 }
