@@ -223,9 +223,23 @@ class OjExceptionHandlerTest {
         assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException(
                 "Invalid UUID string: secret-input")).getMessage()).isEqualTo("Invalid request");
         assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException(
-                "Cannot parse java.time.Duration")).getMessage()).isEqualTo("Invalid request");
+                "class java.time.Duration cannot be parsed")).getMessage()).isEqualTo("Invalid request");
         assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException()).getMessage())
                 .isEqualTo("Invalid request");
+    }
+
+    @Test
+    void curatedIllegalArgumentMessagesPassThroughUntouched() {
+        for (String curated : List.of(
+                "Source code contains blacklisted keyword: java.lang.Runtime",
+                "Invalid tag: x",
+                "Unsupported language: java",
+                "Size must be between 1 and 100")) {
+            assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException(curated)).getMessage())
+                    .isEqualTo(curated);
+        }
+        assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException(
+                "Cannot convert class java.lang.String")).getMessage()).isEqualTo("Invalid request");
     }
 
     @Test

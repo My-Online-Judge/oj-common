@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -57,10 +58,14 @@ public class OjExceptionHandler {
         return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message);
     }
 
-    /** Text produced by the JDK or a library (enum and UUID parsing) names classes and echoes input; never show it. */
+    /** A fully qualified class name (not a bare package mention) at the start or after "constant "/"class ". */
+    private static final Pattern LIBRARY_CLASS = Pattern.compile(
+            "(?:^|constant |class )(?:vn\\.thanhtuanle|java|javax|jakarta|org\\.springframework)\\.[a-z0-9_.]+\\.[A-Z]\\w*");
+
+    /** Enum and UUID parsing text and class names name internals and echo input; never show them. */
     private static boolean isLibraryText(String message) {
-        return message.startsWith("No enum constant") || message.startsWith("Invalid UUID string")
-                || message.contains("vn.thanhtuanle.") || message.contains("java.");
+        return message.startsWith("No enum constant ") || message.startsWith("Invalid UUID string")
+                || LIBRARY_CLASS.matcher(message).find();
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

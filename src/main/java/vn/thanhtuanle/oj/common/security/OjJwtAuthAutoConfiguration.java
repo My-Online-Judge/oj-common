@@ -8,7 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.ssl.SslBundles;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -33,7 +32,7 @@ public class OjJwtAuthAutoConfiguration {
     public JwtDecoder ojJwtDecoder(OjJwtProperties properties, ObjectProvider<SslBundles> sslBundles) {
         if (StringUtils.hasText(properties.jwksSslBundle())) {
             SslBundles bundles = sslBundles.getObject();
-            RestTemplate rest = new RestTemplateBuilder()
+            RestTemplate rest = OjJwtDecoders.restTemplateBuilder()
                     .sslBundle(bundles.getBundle(properties.jwksSslBundle()))
                     .build();
             return OjJwtDecoders.fromJwksUri(properties.jwksUri(), rest);

@@ -15,7 +15,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 import org.springframework.web.client.RestOperations;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 
 import java.text.ParseException;
 import java.time.Clock;
@@ -37,6 +37,14 @@ public final class OjJwtDecoders {
     /** Until a key set has loaded once, a retry is allowed after this long. */
     public static final Duration JWKS_COLD_START_RETRY = Duration.ofSeconds(1);
 
+    /** Connect and read timeout of a JWKS fetch, which holds the key source's lock. */
+    public static final Duration JWKS_FETCH_TIMEOUT = Duration.ofSeconds(3);
+
+    /** A builder whose clients give up on a hung issuer after {@link #JWKS_FETCH_TIMEOUT}. */
+    public static RestTemplateBuilder restTemplateBuilder() {
+        return new RestTemplateBuilder().connectTimeout(JWKS_FETCH_TIMEOUT).readTimeout(JWKS_FETCH_TIMEOUT);
+    }
+
     /**
      * RS256 only, keys fetched from the issuer's JWKS, timestamps checked (60s skew), uid required.
      *
@@ -46,7 +54,7 @@ public final class OjJwtDecoders {
      * Nimbus's 5 minutes and then fails every token until the issuer is back, and refetches for every unknown kid.
      */
     public static JwtDecoder fromJwksUri(String jwksUri) {
-        return fromJwksUri(jwksUri, new RestTemplate());
+        return fromJwksUri(jwksUri, restTemplateBuilder().build());
     }
 
     /** Same as {@link #fromJwksUri(String)}, fetching the key set through {@code rest} (e.g. one presenting a client certificate). */

@@ -109,7 +109,7 @@ class OjJwtDecodersTest {
         JwtDecoder decoder = decoder();
 
         for (int i = 0; i < 100; i++) {
-            String token = signedBy(TestTokens.generate("ghost-" + i));
+            String token = signedBy(new RSAKey.Builder(TestTokens.KEY).keyID("ghost-" + i).build());
             assertThatThrownBy(() -> decoder.decode(token)).isInstanceOf(JwtException.class);
         }
 
@@ -163,6 +163,25 @@ class OjJwtDecodersTest {
         clock.advance(Duration.ofMillis(600));
         assertThat(decoder.decode(TestTokens.valid()).getSubject()).isEqualTo("alice");
         assertThat(requests.get()).isEqualTo(1);
+    }
+
+    @Test
+    void aHungIssuerFailsTheFetchInsteadOfBlockingForever() throws IOException {
+        jwksServer.removeContext("/.well-known/jwks.json");
+        jwksServer.createContext("/.well-known/jwks.json", exchange -> {
+            try {
+                Thread.sleep(30_000); // never answers within the client's timeout
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.close();
+        });
+        JwtDecoder decoder = OjJwtDecoders.fromJwksUri(jwksUri());
+
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> decoder.decode(TestTokens.valid())).isInstanceOf(JwtException.class);
+
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
     }
 
     @Test
