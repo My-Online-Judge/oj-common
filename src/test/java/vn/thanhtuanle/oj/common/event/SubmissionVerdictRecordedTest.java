@@ -27,12 +27,15 @@ class SubmissionVerdictRecordedTest {
     private static final UUID EVENT = UUID.fromString("00000000-0000-0000-0000-00000000000e");
     private static final UUID SUBMISSION = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID PROBLEM = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final UUID USER = UUID.fromString("00000000-0000-0000-0000-000000000003");
+    private static final UUID CONTEST = UUID.fromString("00000000-0000-0000-0000-000000000004");
+    private static final Instant SUBMITTED = Instant.parse("2026-10-03T09:59:00Z");
 
     @Test
     void serializesToThePinnedWireFormat() throws Exception {
         EventEnvelope<SubmissionVerdictRecorded> envelope = new EventEnvelope<>(EVENT,
                 SubmissionVerdictRecorded.TYPE, SubmissionVerdictRecorded.VERSION,
-                Instant.parse("2026-10-03T10:00:00Z"), new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, 0));
+                Instant.parse("2026-10-03T10:00:00Z"), new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, 0, false, USER, CONTEST, SUBMITTED));
 
         assertThat(mapper.writeValueAsString(envelope)).isEqualTo("{"
                 + "\"eventId\":\"00000000-0000-0000-0000-00000000000e\","
@@ -40,13 +43,16 @@ class SubmissionVerdictRecordedTest {
                 + "\"version\":1,"
                 + "\"occurredAt\":\"2026-10-03T10:00:00Z\","
                 + "\"payload\":{\"submissionId\":\"00000000-0000-0000-0000-000000000001\","
-                + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":0,\"rejudge\":false}}");
+                + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":0,\"rejudge\":false,"
+                + "\"userId\":\"00000000-0000-0000-0000-000000000003\","
+                + "\"contestId\":\"00000000-0000-0000-0000-000000000004\","
+                + "\"submittedAt\":\"2026-10-03T09:59:00Z\"}}");
     }
 
     @Test
     void roundTripsThroughJson() throws Exception {
-        EventEnvelope<SubmissionVerdictRecorded> sent = new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, -1)
-                .toEnvelope();
+        EventEnvelope<SubmissionVerdictRecorded> sent = new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, -1,
+                true, USER, CONTEST, SUBMITTED).toEnvelope();
 
         EventEnvelope<SubmissionVerdictRecorded> received = mapper.readValue(mapper.writeValueAsBytes(sent),
                 new TypeReference<EventEnvelope<SubmissionVerdictRecorded>>() { });
@@ -81,5 +87,22 @@ class SubmissionVerdictRecordedTest {
 
         assertThat(received.payload().rejudge()).isFalse();
         assertThat(received.payload()).isEqualTo(new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, 0));
+    }
+
+    @Test
+    void readsAPayloadWithoutTheNewFields() throws Exception {
+        String old = "{\"eventId\":\"00000000-0000-0000-0000-00000000000e\","
+                + "\"eventType\":\"SubmissionVerdictRecorded\",\"version\":1,"
+                + "\"occurredAt\":\"2026-10-03T10:00:00Z\","
+                + "\"payload\":{\"submissionId\":\"00000000-0000-0000-0000-000000000001\","
+                + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":-1}}";
+
+        SubmissionVerdictRecorded p = mapper.readValue(old,
+                new TypeReference<EventEnvelope<SubmissionVerdictRecorded>>() { }).payload();
+
+        assertThat(p.userId()).isNull();
+        assertThat(p.contestId()).isNull();
+        assertThat(p.submittedAt()).isNull();
+        assertThat(p.rejudge()).isFalse();
     }
 }

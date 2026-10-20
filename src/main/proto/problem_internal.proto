@@ -10,16 +10,22 @@ option java_package = "vn.thanhtuanle.oj.common.grpc.problem.v1";
 option java_multiple_files = true;
 
 service ProblemInternal {
-  // NOT_FOUND: unknown, deleted, or INACTIVE without allow_inactive. FAILED_PRECONDITION: no test-case bundle published.
+  // NOT_FOUND: unknown, deleted, or INACTIVE without allow_inactive (unless contest_slug names a running contest that
+  // contains it). FAILED_PRECONDITION: no test-case bundle published; also when contest_slug names a contest that is not
+  // running or does not contain the problem (trailer `oj-reason: CONTEST_NOT_RUNNING`), and when the problem's checker
+  // source is missing.
   rpc GetJudgeSpec(GetJudgeSpecRequest) returns (JudgeSpec);
   // Sample test cases only; hidden contents never leave problem-service. Unknown id: empty list.
   // Deleted problems included, so old submissions stay readable.
   rpc GetSampleTestCases(GetSampleTestCasesRequest) returns (SampleTestCases);
+  // The subset of the given slugs that are ACTIVE (visible to anyone). Unknown, deleted and INACTIVE slugs are omitted.
+  rpc ListVisibleSlugs(ListVisibleSlugsRequest) returns (ListVisibleSlugsResponse);
 }
 
 message GetJudgeSpecRequest {
   string problem_slug = 1;
   bool allow_inactive = 2; // true: serve an INACTIVE problem (caller holds problem:update, or a rejudge)
+  string contest_slug = 3; // empty: not a contest submission
 }
 
 message JudgeSpec {
@@ -28,6 +34,9 @@ message JudgeSpec {
   int32 time_limit_ms = 3;
   int64 memory_limit_mb = 4;
   string test_case_version = 5; // CURRENT bundle hash
+  string contest_id = 6; // set when contest_slug named a running contest that contains the problem
+  string spj_source = 7; // the checker's C++ source; empty when the problem has no checker
+  string spj_version = 8; // sha256 hex of spj_source; empty when the problem has no checker
 }
 
 message GetSampleTestCasesRequest {
@@ -42,4 +51,12 @@ message SampleTestCase {
   string name = 1; // the judge's name for it: the file stem, e.g. "1"
   string input = 2;
   string expected_output = 3;
+}
+
+message ListVisibleSlugsRequest {
+  repeated string slugs = 1;
+}
+
+message ListVisibleSlugsResponse {
+  repeated string slugs = 1;
 }
