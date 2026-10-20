@@ -91,6 +91,12 @@
 			<artifactId>spring-webmvc</artifactId>
 			<optional>true</optional>
 		</dependency>
+		<!-- Optional: ConstraintViolationException (OjExceptionHandler). Every servlet service has it via its validation starter. -->
+		<dependency>
+			<groupId>jakarta.validation</groupId>
+			<artifactId>jakarta.validation-api</artifactId>
+			<optional>true</optional>
+		</dependency>
 		<!-- The trace id on a 500 (TraceIds). The OTel Java agent bridges this API; no SDK is needed. -->
 		<dependency>
 			<groupId>io.opentelemetry</groupId>

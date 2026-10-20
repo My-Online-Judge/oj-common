@@ -1,10 +1,18 @@
 package vn.thanhtuanle.oj.common.web.error;
 
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.bind.ServletRequestBindingException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -24,6 +32,7 @@ import vn.thanhtuanle.oj.common.web.payload.ApiResponse;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,8 +47,20 @@ public class OjExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Object> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.error("IllegalArgumentException: ", ex);
-        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
+        String message = ex.getMessage();
+        if (message == null || isLibraryText(message)) {
+            log.warn("IllegalArgumentException (message withheld): ", ex);
+            message = "Invalid request";
+        } else {
+            log.error("IllegalArgumentException: ", ex);
+        }
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message);
+    }
+
+    /** Text produced by the JDK or a library (enum and UUID parsing) names classes and echoes input; never show it. */
+    private static boolean isLibraryText(String message) {
+        return message.startsWith("No enum constant") || message.startsWith("Invalid UUID string")
+                || message.contains("vn.thanhtuanle.") || message.contains("java.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -48,7 +69,7 @@ public class OjExceptionHandler {
         log.error("Validation error: ", ex);
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
+            String fieldName = error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
@@ -90,6 +111,48 @@ public class OjExceptionHandler {
     public ApiResponse<Object> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
         log.warn("Invalid value for parameter {}", ex.getName());
         return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Invalid value for parameter: " + ex.getName());
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, ServletRequestBindingException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleRequestBinding(Exception ex) {
+        log.warn("Bad request: {}", ex.getMessage());
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Invalid request");
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleHandlerMethodValidation(HandlerMethodValidationException ex) {
+        log.warn("Method validation failed: {}", ex.getMessage());
+        String message = ex.getAllErrors().stream()
+                .map(MessageSourceResolvable::getDefaultMessage)
+                .filter(Objects::nonNull)
+                .findFirst().orElse("Validation failed");
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleConstraintViolation(ConstraintViolationException ex) {
+        log.warn("Constraint violation: {}", ex.getMessage());
+        String message = ex.getConstraintViolations().stream()
+                .map(ConstraintViolation::getMessage)
+                .findFirst().orElse("Validation failed");
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    @ResponseStatus(HttpStatus.NOT_ACCEPTABLE)
+    public ApiResponse<Object> handleMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException ex) {
+        log.warn("Not acceptable: {}", ex.getMessage());
+        return ApiResponse.error(HttpStatus.NOT_ACCEPTABLE.value(), "Not acceptable");
+    }
+
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiResponse<Object> handleAsyncTimeout(AsyncRequestTimeoutException ex) {
+        log.warn("Async request timed out");
+        return ApiResponse.error(HttpStatus.SERVICE_UNAVAILABLE.value(), "Request timed out");
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

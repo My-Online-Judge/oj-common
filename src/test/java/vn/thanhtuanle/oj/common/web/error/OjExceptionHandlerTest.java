@@ -1,5 +1,7 @@
 package vn.thanhtuanle.oj.common.web.error;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
@@ -26,7 +28,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.mock.http.client.MockClientHttpRequest;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -34,6 +43,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -204,6 +214,88 @@ class OjExceptionHandlerTest {
 
         assertThat(body.getStatus()).isEqualTo(400);
         assertThat(body.getMessage()).isEqualTo("Malformed JSON request");
+    }
+
+    @Test
+    void libraryTextOfAnIllegalArgumentStaysInternal() {
+        assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException(
+                "No enum constant vn.thanhtuanle.oj.problem.Status.NOPE")).getMessage()).isEqualTo("Invalid request");
+        assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException(
+                "Invalid UUID string: secret-input")).getMessage()).isEqualTo("Invalid request");
+        assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException(
+                "Cannot parse java.time.Duration")).getMessage()).isEqualTo("Invalid request");
+        assertThat(handler.handleIllegalArgumentException(new IllegalArgumentException()).getMessage())
+                .isEqualTo("Invalid request");
+    }
+
+    @Test
+    void missingPartAndBindingErrorsAre400() {
+        assertThat(handler.handleRequestBinding(new MissingServletRequestPartException("file")))
+                .satisfies(b -> assertThat(b.getStatus()).isEqualTo(400))
+                .satisfies(b -> assertThat(b.getMessage()).isEqualTo("Invalid request"));
+        var header = handler.handleRequestBinding(new MissingRequestHeaderException("X-Id", sampleParameter()));
+        assertThat(header.getStatus()).isEqualTo(400);
+        assertThat(header.getMessage()).doesNotContain("X-Id");
+    }
+
+    @Test
+    void handlerMethodValidationIs400WithTheFirstMessage() {
+        var ex = org.mockito.Mockito.mock(HandlerMethodValidationException.class);
+        org.mockito.Mockito.doReturn(List.of(new DefaultMessageSourceResolvable(new String[] {"c"}, null, "must not be blank")))
+                .when(ex).getAllErrors();
+
+        var body = handler.handleHandlerMethodValidation(ex);
+
+        assertThat(body.getStatus()).isEqualTo(400);
+        assertThat(body.getMessage()).isEqualTo("must not be blank");
+    }
+
+    @Test
+    void constraintViolationIs400WithTheFirstMessage() {
+        @SuppressWarnings("unchecked")
+        ConstraintViolation<Object> violation = org.mockito.Mockito.mock(ConstraintViolation.class);
+        org.mockito.Mockito.when(violation.getMessage()).thenReturn("size must be at most 100");
+
+        var body = handler.handleConstraintViolation(new ConstraintViolationException(Set.of(violation)));
+
+        assertThat(body.getStatus()).isEqualTo(400);
+        assertThat(body.getMessage()).isEqualTo("size must be at most 100");
+    }
+
+    @Test
+    void notAcceptableIs406() {
+        var body = handler.handleMediaTypeNotAcceptable(new HttpMediaTypeNotAcceptableException("no"));
+
+        assertThat(body.getStatus()).isEqualTo(406);
+        assertThat(body.getMessage()).isEqualTo("Not acceptable");
+    }
+
+    @Test
+    void asyncTimeoutIs503() {
+        var body = handler.handleAsyncTimeout(new AsyncRequestTimeoutException());
+
+        assertThat(body.getStatus()).isEqualTo(503);
+        assertThat(body.getMessage()).isEqualTo("Request timed out");
+    }
+
+    @Test
+    void aClassLevelValidationErrorIs400NotAClassCast() throws Exception {
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(new Object(), "dto");
+        result.addError(new ObjectError("dto", "end must be after start"));
+
+        var body = handler.handleValidationExceptions(new MethodArgumentNotValidException(sampleParameter(), result));
+
+        assertThat(body.getStatus()).isEqualTo(400);
+        assertThat(body.getMessage()).isEqualTo("end must be after start");
+        assertThat(body.getErrors()).containsEntry("dto", "end must be after start");
+    }
+
+    private MethodParameter sampleParameter() {
+        try {
+            return new MethodParameter(OjExceptionHandlerTest.class.getDeclaredMethod("sample", String.class), 0);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @SuppressWarnings("unused")
