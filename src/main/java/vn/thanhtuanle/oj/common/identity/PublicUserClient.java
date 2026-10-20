@@ -1,5 +1,6 @@
 package vn.thanhtuanle.oj.common.identity;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -40,10 +41,24 @@ public class PublicUserClient {
     private final Map<String, Entry> byName = new ConcurrentHashMap<>();
     private final Map<UUID, Entry> byId = new ConcurrentHashMap<>();
 
+    private final MeterRegistry meters;
+
     public PublicUserClient(RestClient rest, Clock clock, Duration ttl) {
+        this(rest, clock, ttl, null);
+    }
+
+    /** @param meters counts failures as {@code oj.identity.client.failures{call}}; null counts nothing */
+    public PublicUserClient(RestClient rest, Clock clock, Duration ttl, MeterRegistry meters) {
         this.rest = rest;
         this.clock = clock;
         this.ttl = ttl;
+        this.meters = meters;
+    }
+
+    private void countFailure(String call) {
+        if (meters != null) {
+            meters.counter("oj.identity.client.failures", "call", call).increment();
+        }
     }
 
     /** The profile, or empty on 404 (not cached). Any other failure throws {@link IdentityUnavailableException}. */
@@ -65,8 +80,10 @@ public class PublicUserClient {
         } catch (HttpClientErrorException.NotFound e) {
             return Optional.empty();
         } catch (IdentityUnavailableException e) {
+            countFailure("by_username");
             throw e;
         } catch (RuntimeException e) {
+            countFailure("by_username");
             throw new IdentityUnavailableException("Identity is unavailable", e);
         }
     }
@@ -98,6 +115,7 @@ public class PublicUserClient {
                 }
             }
         } catch (RuntimeException e) {
+            countFailure("by_ids");
             log.warn("Identity profiles unavailable, serving the cached subset: {}", e.toString());
         }
         return result;

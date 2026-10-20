@@ -1,6 +1,13 @@
 package vn.thanhtuanle.oj.common.identity;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration;
+import org.springframework.boot.web.client.RestClientCustomizer;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClient.Builder;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.ssl.SslAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -21,6 +28,35 @@ class OjIdentityClientAutoConfigurationTest {
     void clientWithBaseUrl() {
         runner.withPropertyValues("oj.identity.base-url=http://identity:8000")
                 .run(ctx -> assertThat(ctx).hasSingleBean(PublicUserClient.class));
+    }
+
+    @Test
+    void usesBootsRestClientBuilderSoCallsAreObserved() {
+        AtomicInteger customised = new AtomicInteger();
+        runner.withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration.class))
+                .withBean(RestClientCustomizer.class, () -> (Builder b) -> customised.incrementAndGet())
+                .withPropertyValues("oj.identity.base-url=http://identity:8000")
+                .run(ctx -> {
+                    assertThat(ctx).hasSingleBean(PublicUserClient.class);
+                    assertThat(customised.get()).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void fallsBackToThePlainBuilderWithoutBoots() {
+        runner.withPropertyValues("oj.identity.base-url=http://identity:8000")
+                .run(ctx -> assertThat(ctx).hasNotFailed().hasSingleBean(PublicUserClient.class));
+    }
+
+    @Test
+    void failuresAreCountedOnTheContextsMeterRegistry() {
+        runner.withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withPropertyValues("oj.identity.base-url=http://127.0.0.1:1")
+                .run(ctx -> {
+                    ctx.getBean(PublicUserClient.class).byIds(java.util.List.of(java.util.UUID.randomUUID()));
+                    assertThat(ctx.getBean(MeterRegistry.class)
+                            .counter("oj.identity.client.failures", "call", "by_ids").count()).isEqualTo(1.0);
+                });
     }
 
     @Test

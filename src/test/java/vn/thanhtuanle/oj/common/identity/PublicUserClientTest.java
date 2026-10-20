@@ -1,5 +1,6 @@
 package vn.thanhtuanle.oj.common.identity;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -34,13 +35,15 @@ class PublicUserClientTest {
     private MutableClock clock;
     private MockRestServiceServer server;
     private PublicUserClient client;
+    private SimpleMeterRegistry meters;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
         server = MockRestServiceServer.bindTo(builder).build();
         clock = new MutableClock();
-        client = new PublicUserClient(builder.build(), clock, Duration.ofMinutes(5));
+        meters = new SimpleMeterRegistry();
+        client = new PublicUserClient(builder.build(), clock, Duration.ofMinutes(5), meters);
     }
 
     private static String user(UUID id, String username) {
@@ -88,6 +91,23 @@ class PublicUserClientTest {
         assertThatThrownBy(() -> client.byUsername("alice"))
                 .isInstanceOf(IdentityUnavailableException.class)
                 .isInstanceOf(RuntimeException.class);
+        assertThat(failures("by_username")).isEqualTo(1.0);
+        assertThat(failures("by_ids")).isZero();
+    }
+
+    @Test
+    void aNotFoundUsernameIsNotAFailure() {
+        server.expect(requestTo(BASE + "/api/v1/users/public/ghost"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"status\":404,\"message\":\"Not found\"}"));
+
+        assertThat(client.byUsername("ghost")).isEmpty();
+
+        assertThat(failures("by_username")).isZero();
+    }
+
+    private double failures(String call) {
+        return meters.counter("oj.identity.client.failures", "call", call).count();
     }
 
     @Test
@@ -134,6 +154,8 @@ class PublicUserClientTest {
         Map<UUID, PublicUser> result = client.byIds(Set.of(cached, missing));
 
         assertThat(result).containsOnlyKeys(cached);
+        assertThat(failures("by_ids")).isEqualTo(1.0);
+        assertThat(failures("by_username")).isZero();
     }
 
     private static final class MutableClock extends Clock {
