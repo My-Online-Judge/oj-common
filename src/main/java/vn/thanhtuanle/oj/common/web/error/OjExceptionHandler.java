@@ -1,7 +1,15 @@
 package vn.thanhtuanle.oj.common.web.error;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -16,6 +24,8 @@ import vn.thanhtuanle.oj.common.web.payload.ApiResponse;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The handlers every OJ service shares. A service registers them by declaring
@@ -55,15 +65,64 @@ public class OjExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Object> handleHttpMessageNotReadableException(
             HttpMessageNotReadableException ex) {
-        log.error("Malformed JSON request: ", ex);
-        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Malformed JSON request: " + ex.getMessage());
+        log.warn("Malformed JSON request: {}", ex.getMessage());
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Malformed JSON request");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Object> handleGlobalException(Exception ex) {
         log.error("Internal Server Error: ", ex);
-        return ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error: " + ex.getMessage());
+        ApiResponse<Object> body = ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal server error");
+        body.setTraceId(TraceIds.current().orElse(null));
+        return body;
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
+        log.warn("Missing request parameter: {}", ex.getParameterName());
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Missing request parameter: " + ex.getParameterName());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        log.warn("Invalid value for parameter {}", ex.getName());
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Invalid value for parameter: " + ex.getName());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Object> handleNoResourceFound(NoResourceFoundException ex) {
+        log.warn("No resource: {} {}", ex.getHttpMethod(), ex.getResourcePath());
+        return ApiResponse.error(HttpStatus.NOT_FOUND.value(), "Not found");
+    }
+
+    @ExceptionHandler(NoHandlerFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Object> handleNoHandlerFound(NoHandlerFoundException ex) {
+        log.warn("No handler: {} {}", ex.getHttpMethod(), ex.getRequestURL());
+        return ApiResponse.error(HttpStatus.NOT_FOUND.value(), "Not found");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        log.warn("Method not allowed: {}", ex.getMethod());
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        Set<HttpMethod> allowed = ex.getSupportedHttpMethods();
+        if (allowed != null && !allowed.isEmpty()) {
+            response.header(HttpHeaders.ALLOW,
+                    allowed.stream().map(HttpMethod::name).collect(Collectors.joining(", ")));
+        }
+        return response.body(ApiResponse.error(HttpStatus.METHOD_NOT_ALLOWED.value(), "Method not allowed"));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+    public ApiResponse<Object> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        log.warn("Unsupported media type: {}", ex.getContentType());
+        return ApiResponse.error(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(), "Unsupported media type");
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -89,7 +148,7 @@ public class OjExceptionHandler {
         ErrorCodeSpec errorCode = ex.getErrorCode();
         return ResponseEntity
                 .status(errorCode.getStatusCode())
-                .header(org.springframework.http.HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
                 .body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
     }
 

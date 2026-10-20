@@ -23,6 +23,8 @@ public class ApiResponse<T> {
     private T data;
     private Map<String, String> errors;
     private String timestamp;
+    /** Set on a 500 only: the trace to look up in Jaeger. */
+    private String traceId;
 
     private PageResponse<?> pagination;
 

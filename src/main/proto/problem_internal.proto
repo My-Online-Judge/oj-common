@@ -10,7 +10,7 @@ option java_package = "vn.thanhtuanle.oj.common.grpc.problem.v1";
 option java_multiple_files = true;
 
 service ProblemInternal {
-  // NOT_FOUND: unknown or deleted slug. FAILED_PRECONDITION: no test-case bundle published.
+  // NOT_FOUND: unknown, deleted, or INACTIVE without allow_inactive. FAILED_PRECONDITION: no test-case bundle published.
   rpc GetJudgeSpec(GetJudgeSpecRequest) returns (JudgeSpec);
   // Sample test cases only; hidden contents never leave problem-service. Unknown id: empty list.
   // Deleted problems included, so old submissions stay readable.
@@ -19,6 +19,7 @@ service ProblemInternal {
 
 message GetJudgeSpecRequest {
   string problem_slug = 1;
+  bool allow_inactive = 2; // true: serve an INACTIVE problem (caller holds problem:update, or a rejudge)
 }
 
 message JudgeSpec {

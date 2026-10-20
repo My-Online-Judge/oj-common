@@ -12,7 +12,7 @@
 	</parent>
 	<groupId>vn.thanhtuanle</groupId>
 	<artifactId>oj-common</artifactId>
-	<version>0.6.0</version>
+	<version>0.7.0</version>
 	<name>oj-common</name>
 	<description>Code shared by the My Online Judge services</description>
 	<properties>
@@ -84,6 +84,17 @@
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-web</artifactId>
 			<optional>true</optional>
+		</dependency>
+		<!-- Optional: NoResourceFoundException / NoHandlerFoundException (OjExceptionHandler). -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-webmvc</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<!-- The trace id on a 500 (TraceIds). The OTel Java agent bridges this API; no SDK is needed. -->
+		<dependency>
+			<groupId>io.opentelemetry</groupId>
+			<artifactId>opentelemetry-api</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.data</groupId>
