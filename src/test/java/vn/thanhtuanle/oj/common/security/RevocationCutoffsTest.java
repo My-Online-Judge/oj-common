@@ -53,6 +53,39 @@ class RevocationCutoffsTest {
         assertThat(RevocationCutoffs.revoked(1001, 0, SECONDS, MILLIS)).isFalse();
     }
 
+    /** A later revocation at 2000.100 s, written by one identity as a pair. */
+    private static final Instant LATER_AT = Instant.ofEpochMilli(2_000_100);
+    private static final String LATER_SECONDS = RevocationCutoffs.secondsMarker(LATER_AT);
+    private static final String LATER_MILLIS = RevocationCutoffs.millisMarker(LATER_AT);
+
+    @Test
+    void aMillisecondMarkerNewerThanTheSecondsMarkerDecides() {
+        // seconds still hold the revocation at 1000.5 s, milliseconds the one at 2000.1 s
+        assertThat(RevocationCutoffs.revoked(2000, 2_000_050, SECONDS, LATER_MILLIS)).isTrue();
+        assertThat(RevocationCutoffs.revoked(2000, 2_000_200, SECONDS, LATER_MILLIS)).isFalse();
+    }
+
+    @Test
+    void aSecondsMarkerNewerThanTheMillisecondMarkerDecides() {
+        // an identity rolled back to seconds-only wrote the 2000.1 s revocation; the ms key is the stale 1000.5 s one
+        assertThat(RevocationCutoffs.revoked(1500, 1_500_000, LATER_SECONDS, MILLIS)).isTrue();
+        // a failed ms write after the seconds write behaves the same
+        assertThat(RevocationCutoffs.revoked(2000, 2_000_500, LATER_SECONDS, MILLIS)).isTrue();
+        assertThat(RevocationCutoffs.revoked(2001, 2_001_000, LATER_SECONDS, MILLIS)).isFalse();
+    }
+
+    @Test
+    void aMillisecondMarkerAloneDecides() {
+        assertThat(RevocationCutoffs.revoked(1000, 1_000_400, null, MILLIS)).isTrue();
+        assertThat(RevocationCutoffs.revoked(1000, 1_000_600, null, MILLIS)).isFalse();
+    }
+
+    @Test
+    void aTokenWithoutIatMsUsesTheSecondsMarkerEvenWhenBothMarkersExist() {
+        assertThat(RevocationCutoffs.revoked(2000, 0, LATER_SECONDS, LATER_MILLIS)).isTrue();
+        assertThat(RevocationCutoffs.revoked(2001, 0, LATER_SECONDS, LATER_MILLIS)).isFalse();
+    }
+
     @Test
     void aMarkerFromAnOlderIdentityUsesWholeSeconds() {
         assertThat(RevocationCutoffs.revoked(1000, 1_000_900, SECONDS, null)).isTrue();

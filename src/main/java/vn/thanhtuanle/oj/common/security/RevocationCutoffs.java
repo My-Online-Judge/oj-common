@@ -8,9 +8,10 @@ import java.time.Instant;
  * <p>Identity stores two markers when it revokes a user's sessions: the epoch second after the revocation
  * ({@link vn.thanhtuanle.oj.common.redis.RedisKeys#tokenRevokedBefore}) and the epoch millisecond after it
  * ({@link vn.thanhtuanle.oj.common.redis.RedisKeys#tokenRevokedBeforeMillis}). A token that carries
- * {@link OjJwtDecoders#IAT_MS_CLAIM} is judged by the millisecond marker when one exists, so a login later in the
- * same second survives. A legacy token, or a marker written by an identity that only knows seconds, falls back to the
- * whole-second rule.
+ * {@link OjJwtDecoders#IAT_MS_CLAIM} is judged by the millisecond marker when one exists and is at least as new as
+ * the seconds marker, so a login later in the same second survives. A legacy token, a marker written by an identity
+ * that only knows seconds, or a millisecond marker older than the seconds marker falls back to the whole-second rule,
+ * so revocation is never looser than that rule.
  */
 public final class RevocationCutoffs {
 
@@ -37,7 +38,13 @@ public final class RevocationCutoffs {
      */
     public static boolean revoked(long iatSeconds, long iatMillis, String secondsCutoff, String millisCutoff) {
         if (iatMillis > 0 && millisCutoff != null) {
-            return iatMillis < Long.parseLong(millisCutoff);
+            long millis = Long.parseLong(millisCutoff);
+            // A pair written from one instant has (millis - 1) / 1000 == seconds - 1. A seconds marker that is newer
+            // means the millisecond key is stale (an identity rolled back, or its second write failed), so it must
+            // not hide that revocation.
+            if (secondsCutoff == null || (millis - 1) / 1000 >= Long.parseLong(secondsCutoff) - 1) {
+                return iatMillis < millis;
+            }
         }
         if (secondsCutoff != null) {
             return iatSeconds < Long.parseLong(secondsCutoff);

@@ -72,10 +72,13 @@ Access tokens carry `iat_ms` (`OjJwtDecoders.IAT_MS_CLAIM`), the same instant as
 
 | Token | Markers present | Revoked when |
 |---|---|---|
-| has `iat_ms` | millisecond marker | `iat_ms < millisCutoff` |
+| has `iat_ms` | millisecond marker at least as new as the seconds marker (or no seconds marker) | `iat_ms < millisCutoff` |
+| has `iat_ms` | millisecond marker older than the seconds marker (stale) | `iat < secondsCutoff` |
 | has `iat_ms` | seconds marker only (an older identity) | `iat < secondsCutoff` |
 | no `iat_ms` (minted before the upgrade) | seconds marker | `iat < secondsCutoff` |
 | any | none | never |
 
 So a login later in the same second as the revocation keeps working, and every mix of old and new identity and
-gateway keeps at least today's whole-second rule. A marker that is not a number throws `NumberFormatException`.
+gateway keeps at least today's whole-second rule. A millisecond marker counts only when
+`(millisCutoff - 1) / 1000 >= secondsCutoff - 1`, which a pair written together always satisfies; an identity rolled
+back alone, or a second write that failed, can leave a stale millisecond key that must not hide a newer seconds marker. A marker that is not a number throws `NumberFormatException`.
