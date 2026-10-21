@@ -47,6 +47,7 @@ public class OjIdentityClientAutoConfiguration {
                 .baseUrl(properties.baseUrl())
                 .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(settings))
                 .build();
-        return new PublicUserClient(rest, Clock.systemUTC(), properties.cacheTtl(), meters.getIfAvailable());
+        return new PublicUserClient(rest, Clock.systemUTC(), properties.cacheTtl(),
+                properties.negativeCacheTtl(), meters.getIfAvailable());
     }
 }

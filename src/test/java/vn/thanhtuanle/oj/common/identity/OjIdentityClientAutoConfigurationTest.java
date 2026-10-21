@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration;
 import org.springframework.boot.web.client.RestClientCustomizer;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClient.Builder;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,6 +29,24 @@ class OjIdentityClientAutoConfigurationTest {
     void clientWithBaseUrl() {
         runner.withPropertyValues("oj.identity.base-url=http://identity:8000")
                 .run(ctx -> assertThat(ctx).hasSingleBean(PublicUserClient.class));
+    }
+
+    @Test
+    void negativeTtlIsConfigurable() {
+        runner.withPropertyValues("oj.identity.base-url=http://identity:8000", "oj.identity.negative-cache-ttl=5s")
+                .run(ctx -> {
+                    assertThat(ctx.getBean(OjIdentityClientProperties.class).negativeCacheTtl())
+                            .isEqualTo(java.time.Duration.ofSeconds(5));
+                    assertThat(ReflectionTestUtils.getField(ctx.getBean(PublicUserClient.class), "negativeTtl"))
+                            .isEqualTo(java.time.Duration.ofSeconds(5));
+                });
+    }
+
+    @Test
+    void negativeTtlDefaultsToAMinute() {
+        runner.withPropertyValues("oj.identity.base-url=http://identity:8000")
+                .run(ctx -> assertThat(ReflectionTestUtils.getField(ctx.getBean(PublicUserClient.class), "negativeTtl"))
+                        .isEqualTo(java.time.Duration.ofSeconds(60)));
     }
 
     @Test
