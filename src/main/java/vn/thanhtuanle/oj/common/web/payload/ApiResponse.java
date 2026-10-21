@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
+import vn.thanhtuanle.oj.common.web.error.ErrorCodeSpec;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -20,6 +21,8 @@ import java.util.List;
 public class ApiResponse<T> {
     private int status;
     private String message;
+    /** Set on an {@code AppException} answer only: its {@code ErrorCodeSpec} name, e.g. {@code RATE_LIMITED}. */
+    private String code;
     private T data;
     private Map<String, String> errors;
     private String timestamp;
@@ -93,6 +96,15 @@ public class ApiResponse<T> {
                 .message(message)
                 .data(null)
                 .errors(errors)
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
+                .build();
+    }
+
+    public static <T> ApiResponse<T> error(ErrorCodeSpec code) {
+        return ApiResponse.<T>builder()
+                .status(code.getStatusCode().value())
+                .message(code.getMessage())
+                .code(code.name())
                 .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
                 .build();
     }

@@ -54,7 +54,11 @@ class OjExceptionHandlerTest {
     @RequiredArgsConstructor
     enum TestCode implements ErrorCodeSpec {
         SLOW_DOWN("You are submitting too fast. Try again in a moment", HttpStatus.TOO_MANY_REQUESTS),
-        AWAY("Problems are temporarily unavailable. Try again in a moment", HttpStatus.SERVICE_UNAVAILABLE);
+        AWAY("Problems are temporarily unavailable. Try again in a moment", HttpStatus.SERVICE_UNAVAILABLE),
+        TEST_CONFLICT("Conflict", HttpStatus.CONFLICT),
+        TEST_DOWN("Down", HttpStatus.SERVICE_UNAVAILABLE),
+        TEST_SLOW("Slow", HttpStatus.TOO_MANY_REQUESTS),
+        TEST_BROKEN("Broken", HttpStatus.INTERNAL_SERVER_ERROR);
 
         private final String message;
         private final HttpStatus statusCode;
@@ -151,6 +155,36 @@ class OjExceptionHandlerTest {
         var body = handler.handleGlobalException(new IllegalStateException("x"));
 
         assertThat(json.readTree(json.writeValueAsString(body)).has("traceId")).isFalse();
+    }
+
+    private String body(Object value) throws Exception {
+        return json.writeValueAsString(value).replaceAll("\"timestamp\":\"\\d{14}\"", "\"timestamp\":\"T\"");
+    }
+
+    @Test
+    void anAppExceptionBodyCarriesItsCode() throws Exception {
+        var response = handler.handleAppException(new AppException(TestCode.TEST_CONFLICT));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(body(response.getBody()))
+                .isEqualTo("{\"status\":409,\"message\":\"Conflict\",\"code\":\"TEST_CONFLICT\",\"timestamp\":\"T\"}");
+    }
+
+    @Test
+    void aRateLimitedBodyCarriesItsCodeAndRetryAfter() throws Exception {
+        var response = handler.handleRateLimitedException(new RateLimitedException(TestCode.TEST_SLOW, 7));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(429);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("7");
+        assertThat(body(response.getBody()))
+                .isEqualTo("{\"status\":429,\"message\":\"Slow\",\"code\":\"TEST_SLOW\",\"timestamp\":\"T\"}");
+    }
+
+    @Test
+    void aFrameworkErrorHasNoCodeKey() throws Exception {
+        var body = handler.handleNoResourceFound(new NoResourceFoundException(HttpMethod.GET, "api/v1/nowhere"));
+
+        assertThat(json.readTree(json.writeValueAsString(body)).has("code")).isFalse();
     }
 
     @Test

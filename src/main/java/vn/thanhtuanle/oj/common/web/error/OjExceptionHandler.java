@@ -53,7 +53,7 @@ public class OjExceptionHandler {
             log.warn("IllegalArgumentException (message withheld): ", ex);
             message = "Invalid request";
         } else {
-            log.error("IllegalArgumentException: ", ex);
+            log.warn("Bad request: {}", message);
         }
         return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message);
     }
@@ -71,13 +71,13 @@ public class OjExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Object> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        log.error("Validation error: ", ex);
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
+        log.warn("Validation failed: {}", errors.keySet());
 
         String message = "Validation failed";
         if (!errors.isEmpty()) {
@@ -197,7 +197,7 @@ public class OjExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Object> handleResourceNotFoundException(
             ResourceNotFoundException ex) {
-        log.error("Resource Not Found: ", ex);
+        log.debug("Not found: {}", ex.getMessage());
         return ApiResponse.error(HttpStatus.NOT_FOUND.value(), ex.getMessage());
     }
 
@@ -205,27 +205,39 @@ public class OjExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Object> handleResourceAlreadyExistException(
             ResourceAlreadyExistException ex) {
-        log.error("Resource Already Exist: ", ex);
+        log.warn("Already exists: {}", ex.getMessage());
         return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
     }
 
     // More specific than handleAppException — Spring routes RateLimitedException here,
     // so the Retry-After reflects the actual remaining cooldown instead of a fixed value.
+    // A 429 is routine (a caller going too fast): DEBUG. A 5xx (a dependency away) is worth a WARN line.
     @ExceptionHandler(RateLimitedException.class)
     public ResponseEntity<ApiResponse<Object>> handleRateLimitedException(RateLimitedException ex) {
         ErrorCodeSpec errorCode = ex.getErrorCode();
+        int status = errorCode.getStatusCode().value();
+        if (status == HttpStatus.TOO_MANY_REQUESTS.value()) {
+            log.debug("{} ({}), Retry-After {}s", errorCode.name(), status, ex.getRetryAfterSeconds());
+        } else {
+            log.warn("{} ({}), Retry-After {}s", errorCode.name(), status, ex.getRetryAfterSeconds());
+        }
         return ResponseEntity
                 .status(errorCode.getStatusCode())
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
-                .body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
+                .body(ApiResponse.error(errorCode));
     }
 
+    /** A client error (4xx) is one WARN line without a stack trace; a server error keeps its stack at ERROR. */
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
-        log.error("AppException: ", ex);
         ErrorCodeSpec errorCode = ex.getErrorCode();
-        return ResponseEntity.status(errorCode.getStatusCode())
-                .body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
+        int status = errorCode.getStatusCode().value();
+        if (errorCode.getStatusCode().is4xxClientError()) {
+            log.warn("{} ({}): {}", errorCode.name(), status, errorCode.getMessage());
+        } else {
+            log.error("{} ({}): {}", errorCode.name(), status, errorCode.getMessage(), ex);
+        }
+        return ResponseEntity.status(errorCode.getStatusCode()).body(ApiResponse.error(errorCode));
     }
 
     /**
@@ -243,7 +255,7 @@ public class OjExceptionHandler {
                     HttpStatus.UNAUTHORIZED.value(),
                     "Unauthorized: Full authentication is required to access this resource"));
         }
-        log.error("Access Denied: ", ex);
+        log.warn("Access denied: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(HttpStatus.FORBIDDEN.value(), "Access Denied: " + ex.getMessage()));
     }

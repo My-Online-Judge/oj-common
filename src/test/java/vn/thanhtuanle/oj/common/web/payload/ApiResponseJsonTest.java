@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import vn.thanhtuanle.oj.common.web.error.ErrorCodeSpec;
 
 import java.util.List;
 import java.util.Map;
@@ -43,5 +45,36 @@ class ApiResponseJsonTest {
                 .isEqualTo("{\"status\":200,\"message\":\"Success\",\"data\":[\"a\",\"b\"],\"timestamp\":\"T\","
                         + "\"pagination\":{\"page\":1,\"size\":2,\"totalElements\":5,\"totalPages\":3,"
                         + "\"hasPrev\":true,\"hasNext\":true,\"prevPage\":0,\"nextPage\":2}}");
+    }
+
+    @Test
+    void codeIsOmittedWhenNull() throws Exception {
+        assertThat(write(ApiResponse.error(404, "Not found")))
+                .isEqualTo("{\"status\":404,\"message\":\"Not found\",\"timestamp\":\"T\"}");
+    }
+
+    @Test
+    void errorFromSpecFillsStatusMessageAndCode() throws Exception {
+        ApiResponse<Object> body = ApiResponse.error(TestCode.TEST_CONFLICT);
+
+        assertThat(body.getStatus()).isEqualTo(409);
+        assertThat(body.getMessage()).isEqualTo("Conflict");
+        assertThat(body.getCode()).isEqualTo("TEST_CONFLICT");
+        assertThat(write(body))
+                .isEqualTo("{\"status\":409,\"message\":\"Conflict\",\"code\":\"TEST_CONFLICT\",\"timestamp\":\"T\"}");
+    }
+
+    enum TestCode implements ErrorCodeSpec {
+        TEST_CONFLICT;
+
+        @Override
+        public String getMessage() {
+            return "Conflict";
+        }
+
+        @Override
+        public HttpStatus getStatusCode() {
+            return HttpStatus.CONFLICT;
+        }
     }
 }
