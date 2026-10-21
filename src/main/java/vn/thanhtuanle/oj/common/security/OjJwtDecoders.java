@@ -28,6 +28,9 @@ public final class OjJwtDecoders {
     /** Claim carrying the user's UUID; a token without it is not an OJ access token. */
     public static final String UID_CLAIM = "uid";
 
+    /** The access token's issue time in epoch milliseconds, the same instant as {@code iat}. */
+    public static final String IAT_MS_CLAIM = "iat_ms";
+
     private OjJwtDecoders() {
     }
 

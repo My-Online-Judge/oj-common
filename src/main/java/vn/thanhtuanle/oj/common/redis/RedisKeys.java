@@ -26,4 +26,12 @@ public final class RedisKeys {
     public static String tokenRevokedBefore(UUID userId) {
         return "oj:token:revoked-before:" + userId;
     }
+
+    /**
+     * Epoch millisecond before which every access token of this user carrying {@code iat_ms} is revoked, written next
+     * to {@link #tokenRevokedBefore(UUID)}: {@code oj:token:revoked-before-ms:<userId>}.
+     */
+    public static String tokenRevokedBeforeMillis(UUID userId) {
+        return "oj:token:revoked-before-ms:" + userId;
+    }
 }

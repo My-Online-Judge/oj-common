@@ -26,4 +26,11 @@ class RedisKeysTest {
         assertThat(RedisKeys.tokenRevokedBefore(id))
                 .isEqualTo("oj:token:revoked-before:11111111-2222-3333-4444-555555555555");
     }
+
+    @Test
+    void millisecondCutoffKey() {
+        UUID id = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        assertThat(RedisKeys.tokenRevokedBeforeMillis(id))
+                .isEqualTo("oj:token:revoked-before-ms:11111111-2222-3333-4444-555555555555");
+    }
 }

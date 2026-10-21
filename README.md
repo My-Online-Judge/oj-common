@@ -57,3 +57,25 @@ What `OjExceptionHandler` logs:
   `oj.identity.client.failures{call}` counts the failed ones.
 
 `PublicUser.avatar` is always null from identity SP14 on; the field stays for compatibility.
+
+## 0.8.1: millisecond revocation cutoffs
+
+Identity revokes every session of a user (role change, disable, delete) by writing two markers with the same TTL:
+
+- `RedisKeys.tokenRevokedBefore(uid)` = `oj:token:revoked-before:<uid>`, the epoch second after the revocation
+  (`RevocationCutoffs.secondsMarker`);
+- `RedisKeys.tokenRevokedBeforeMillis(uid)` = `oj:token:revoked-before-ms:<uid>`, the epoch millisecond after it
+  (`RevocationCutoffs.millisMarker`).
+
+Access tokens carry `iat_ms` (`OjJwtDecoders.IAT_MS_CLAIM`), the same instant as `iat` in milliseconds.
+`RevocationCutoffs.revoked(iat, iatMs, secondsCutoff, millisCutoff)` is the rule the gateway applies:
+
+| Token | Markers present | Revoked when |
+|---|---|---|
+| has `iat_ms` | millisecond marker | `iat_ms < millisCutoff` |
+| has `iat_ms` | seconds marker only (an older identity) | `iat < secondsCutoff` |
+| no `iat_ms` (minted before the upgrade) | seconds marker | `iat < secondsCutoff` |
+| any | none | never |
+
+So a login later in the same second as the revocation keeps working, and every mix of old and new identity and
+gateway keeps at least today's whole-second rule. A marker that is not a number throws `NumberFormatException`.
