@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  * <p>Both the profiles and the absences (a 404, or an id identity did not return) are cached: a profile for the
  * positive TTL, an absence for the negative one. After a failed call the client stops asking for a while
  * ({@link #BACKOFF_START} doubling to {@link #BACKOFF_MAX}); one client talks to one identity, so both calls share
- * that state.
+ * that state. Calls already in flight that fail inside an open window neither extend it nor double the backoff.
  */
 public class PublicUserClient {
 
@@ -95,9 +95,19 @@ public class PublicUserClient {
         return until != null && clock.instant().isBefore(until);
     }
 
+    /**
+     * Opens the next skip window and doubles the backoff. A failure that lands inside a live window changes nothing:
+     * its call was already in flight when an earlier one failed, so it says nothing new about identity, and a burst of
+     * N concurrent failures must not jump the backoff N doublings at once.
+     */
     private void failed() {
         synchronized (backoffLock) {
-            skipUntil = clock.instant().plus(backoff);
+            Instant now = clock.instant();
+            Instant until = skipUntil;
+            if (until != null && now.isBefore(until)) {
+                return;
+            }
+            skipUntil = now.plus(backoff);
             Duration doubled = backoff.multipliedBy(2);
             backoff = doubled.compareTo(BACKOFF_MAX) > 0 ? BACKOFF_MAX : doubled;
         }

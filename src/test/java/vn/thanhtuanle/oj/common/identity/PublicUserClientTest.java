@@ -10,6 +10,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -19,6 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -226,6 +233,67 @@ class PublicUserClientTest {
         clock.advance(Duration.ofMillis(1)); // exactly 30 s after the failure: the window is over
         assertThatThrownBy(() -> client.byUsername("alice")).hasMessage("Identity is unavailable");
         server.verify();
+    }
+
+    /**
+     * Identity goes down while three calls are in flight: all three fail after the first opened its window. Only the
+     * first one counts, so the window is 1 s (not 8 s), and the next failure after it doubles once, to 2 s.
+     */
+    @Test
+    void concurrentFailuresInsideAWindowDoNotDoubleTheBackoff() throws Exception {
+        int inFlight = 3;
+        CountDownLatch allPastTheCheck = new CountDownLatch(inFlight);
+        AtomicInteger requests = new AtomicInteger();
+        PublicUserClient burst = new PublicUserClient(RestClient.builder().baseUrl(BASE)
+                .requestInterceptor((request, body, execution) -> {
+                    if (requests.incrementAndGet() <= inFlight) {
+                        // every call has passed the backoff check before any of them fails
+                        allPastTheCheck.countDown();
+                        try {
+                            if (!allPastTheCheck.await(10, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("the calls did not overlap");
+                            }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                    throw new IOException("Connection refused");
+                }).build(), clock, Duration.ofMinutes(5), Duration.ofSeconds(60), meters);
+
+        ExecutorService pool = Executors.newFixedThreadPool(inFlight);
+        try {
+            List<Future<Throwable>> calls = new ArrayList<>();
+            for (int i = 0; i < inFlight; i++) {
+                String name = "user" + i;
+                calls.add(pool.submit(() -> {
+                    try {
+                        burst.byUsername(name);
+                        return null;
+                    } catch (Throwable t) {
+                        return t;
+                    }
+                }));
+            }
+            for (Future<Throwable> call : calls) {
+                assertThat(call.get(10, TimeUnit.SECONDS)).isInstanceOf(IdentityUnavailableException.class)
+                        .hasMessage("Identity is unavailable");
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(requests).hasValue(inFlight);
+        assertThat(failures("by_username")).isEqualTo(3.0);
+
+        clock.advance(Duration.ofMillis(999));
+        assertThatThrownBy(() -> burst.byUsername("late")).hasMessage("Identity is unavailable (backing off)");
+        clock.advance(Duration.ofMillis(1)); // 1 s after the burst: the window is over
+        assertThatThrownBy(() -> burst.byUsername("late")).hasMessage("Identity is unavailable");
+        assertThat(requests).hasValue(inFlight + 1);
+        clock.advance(Duration.ofMillis(1999)); // the burst doubled the backoff once: this window is 2 s
+        assertThatThrownBy(() -> burst.byUsername("late")).hasMessage("Identity is unavailable (backing off)");
+        clock.advance(Duration.ofMillis(1));
+        assertThatThrownBy(() -> burst.byUsername("late")).hasMessage("Identity is unavailable");
+        assertThat(requests).hasValue(inFlight + 2);
     }
 
     @Test
