@@ -26,6 +26,7 @@ message GetJudgeSpecRequest {
   string problem_slug = 1;
   bool allow_inactive = 2; // true: serve an INACTIVE problem (caller holds problem:update, or a rejudge)
   string contest_slug = 3; // empty: not a contest submission
+  string user_id = 4;      // the submitter (contest enrollment design §4.4); empty for a rejudge, which names no user
 }
 
 message JudgeSpec {

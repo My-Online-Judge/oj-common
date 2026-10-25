@@ -14,6 +14,11 @@ public final class ProblemRpcReasons {
 
     /** FAILED_PRECONDITION: the named contest is not running, or does not contain the problem. */
     public static final String CONTEST_NOT_RUNNING = "CONTEST_NOT_RUNNING";
+    /**
+     * FAILED_PRECONDITION: the named contest requires registration and the submitter ({@code user_id}) is not
+     * registered, or the request names no submitter (contest enrollment design §4.4).
+     */
+    public static final String NOT_ENROLLED = "NOT_ENROLLED";
 
     private ProblemRpcReasons() {
     }
@@ -27,10 +32,26 @@ public final class ProblemRpcReasons {
 
     /** True iff {@code e} is a FAILED_PRECONDITION whose trailers carry {@link #CONTEST_NOT_RUNNING}. */
     public static boolean isContestNotRunning(Throwable e) {
+        return hasReason(e, CONTEST_NOT_RUNNING);
+    }
+
+    /** Trailers for a {@link #NOT_ENROLLED} failure. */
+    public static Metadata notEnrolled() {
+        Metadata trailers = new Metadata();
+        trailers.put(REASON, NOT_ENROLLED);
+        return trailers;
+    }
+
+    /** True iff {@code e} is a FAILED_PRECONDITION whose trailers carry {@link #NOT_ENROLLED}. */
+    public static boolean isNotEnrolled(Throwable e) {
+        return hasReason(e, NOT_ENROLLED);
+    }
+
+    private static boolean hasReason(Throwable e, String reason) {
         if (Status.fromThrowable(e).getCode() != Status.Code.FAILED_PRECONDITION) {
             return false;
         }
         Metadata trailers = Status.trailersFromThrowable(e);
-        return trailers != null && CONTEST_NOT_RUNNING.equals(trailers.get(REASON));
+        return trailers != null && reason.equals(trailers.get(REASON));
     }
 }

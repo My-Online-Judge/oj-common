@@ -52,4 +52,18 @@ class ProblemRpcReasonsTest {
         ListVisibleSlugsResponse res = ListVisibleSlugsResponse.newBuilder().addSlugs("a").build();
         assertThat(ListVisibleSlugsResponse.parseFrom(res.toByteArray()).getSlugsList()).containsExactly("a");
     }
+
+    @Test
+    void notEnrolledIsReadBackFromTrailers() {
+        // The Run code / contest enrollment design §4.4: a second FAILED_PRECONDITION reason, told apart from the first.
+        assertThat(ProblemRpcReasons.isNotEnrolled(Status.FAILED_PRECONDITION
+                .withDescription("Not enrolled in contest")
+                .asRuntimeException(ProblemRpcReasons.notEnrolled()))).isTrue();
+        assertThat(ProblemRpcReasons.isNotEnrolled(
+                Status.FAILED_PRECONDITION.asRuntimeException(ProblemRpcReasons.contestNotRunning()))).isFalse();
+        assertThat(ProblemRpcReasons.isContestNotRunning(
+                Status.FAILED_PRECONDITION.asRuntimeException(ProblemRpcReasons.notEnrolled()))).isFalse();
+        assertThat(ProblemRpcReasons.isNotEnrolled(
+                Status.NOT_FOUND.asRuntimeException(ProblemRpcReasons.notEnrolled()))).isFalse();
+    }
 }

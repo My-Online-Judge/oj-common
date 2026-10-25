@@ -24,4 +24,12 @@ class GetJudgeSpecRequestTest {
 
         assertThat(GetJudgeSpecRequest.parseFrom(sent.toByteArray()).getAllowInactive()).isTrue();
     }
+
+    @Test
+    void userIdDefaultsToEmptyAndRoundTrips() throws Exception {
+        // Contest enrollment design §4.4: field 4 is the submitter; a request from before it has none.
+        assertThat(GetJudgeSpecRequest.parseFrom(new byte[] {0x0a, 0x01, 'a'}).getUserId()).isEmpty();
+        GetJudgeSpecRequest sent = GetJudgeSpecRequest.newBuilder().setProblemSlug("a").setUserId("u1").build();
+        assertThat(GetJudgeSpecRequest.parseFrom(sent.toByteArray()).getUserId()).isEqualTo("u1");
+    }
 }
