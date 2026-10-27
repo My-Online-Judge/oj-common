@@ -20,7 +20,7 @@
 		<!-- The versions Spring gRPC 0.12.0 (the last line on Boot 3.5) manages: the services get gRPC
 		     through its starters, and the stubs generated here must match that runtime. -->
 		<grpc.version>1.76.0</grpc.version>
-		<protobuf-java.version>4.32.1</protobuf-java.version>
+		<protobuf-java.version>4.36.2</protobuf-java.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
