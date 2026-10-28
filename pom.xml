@@ -91,7 +91,7 @@
 			<artifactId>spring-webmvc</artifactId>
 			<optional>true</optional>
 		</dependency>
-		<!-- Optional: ConstraintViolationException (OjExceptionHandler). Every servlet service has it via its validation starter. -->
+		<!-- Optional: ConstraintViolationException (OjExceptionHandler). Every servlet service declares spring-boot-starter-validation itself. -->
 		<dependency>
 			<groupId>jakarta.validation</groupId>
 			<artifactId>jakarta.validation-api</artifactId>
