@@ -35,7 +35,8 @@ class SubmissionVerdictRecordedTest {
     void serializesToThePinnedWireFormat() throws Exception {
         EventEnvelope<SubmissionVerdictRecorded> envelope = new EventEnvelope<>(EVENT,
                 SubmissionVerdictRecorded.TYPE, SubmissionVerdictRecorded.VERSION,
-                Instant.parse("2026-10-03T10:00:00Z"), new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, 0, false, USER, CONTEST, SUBMITTED));
+                Instant.parse("2026-10-03T10:00:00Z"),
+                new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, 0, false, USER, CONTEST, SUBMITTED, 0));
 
         assertThat(mapper.writeValueAsString(envelope)).isEqualTo("{"
                 + "\"eventId\":\"00000000-0000-0000-0000-00000000000e\","
@@ -46,7 +47,38 @@ class SubmissionVerdictRecordedTest {
                 + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":0,\"rejudge\":false,"
                 + "\"userId\":\"00000000-0000-0000-0000-000000000003\","
                 + "\"contestId\":\"00000000-0000-0000-0000-000000000004\","
-                + "\"submittedAt\":\"2026-10-03T09:59:00Z\"}}");
+                + "\"submittedAt\":\"2026-10-03T09:59:00Z\","
+                + "\"rejudgeCount\":0}}");
+    }
+
+    @Test
+    void aRejudgeCarriesItsGenerationOverTheWire() throws Exception {
+        EventEnvelope<SubmissionVerdictRecorded> sent = new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, -1,
+                true, USER, CONTEST, SUBMITTED, 3).toEnvelope();
+
+        EventEnvelope<SubmissionVerdictRecorded> received = mapper.readValue(mapper.writeValueAsBytes(sent),
+                new TypeReference<EventEnvelope<SubmissionVerdictRecorded>>() { });
+
+        assertThat(received).isEqualTo(sent);
+        assertThat(received.payload().rejudgeCount()).isEqualTo(3);
+    }
+
+    @Test
+    void anEventFromAProducerOlderThan0_10_0HasNoGeneration() throws Exception {
+        String old = "{\"eventId\":\"00000000-0000-0000-0000-00000000000e\","
+                + "\"eventType\":\"SubmissionVerdictRecorded\",\"version\":1,"
+                + "\"occurredAt\":\"2026-10-03T10:00:00Z\","
+                + "\"payload\":{\"submissionId\":\"00000000-0000-0000-0000-000000000001\","
+                + "\"problemId\":\"00000000-0000-0000-0000-000000000002\",\"verdict\":-1,\"rejudge\":true,"
+                + "\"userId\":\"00000000-0000-0000-0000-000000000003\","
+                + "\"contestId\":\"00000000-0000-0000-0000-000000000004\","
+                + "\"submittedAt\":\"2026-10-03T09:59:00Z\"}}";
+
+        SubmissionVerdictRecorded p = mapper.readValue(old,
+                new TypeReference<EventEnvelope<SubmissionVerdictRecorded>>() { }).payload();
+
+        assertThat(p.rejudgeCount()).isNull();
+        assertThat(p).isEqualTo(new SubmissionVerdictRecorded(SUBMISSION, PROBLEM, -1, true, USER, CONTEST, SUBMITTED));
     }
 
     @Test
@@ -103,6 +135,7 @@ class SubmissionVerdictRecordedTest {
         assertThat(p.userId()).isNull();
         assertThat(p.contestId()).isNull();
         assertThat(p.submittedAt()).isNull();
+        assertThat(p.rejudgeCount()).isNull();
         assertThat(p.rejudge()).isFalse();
     }
 }
