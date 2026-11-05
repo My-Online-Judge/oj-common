@@ -15,6 +15,22 @@ Code shared by the My Online Judge services.
 Build with `./mvnw` (Maven 3.9.9): the protobuf plugin needs Maven ≥ 3.9.6 and runs glibc binaries
 (protoc, protoc-gen-grpc-java), so Docker builds use `maven:3.9-eclipse-temurin-17`, not the Alpine image.
 
+## 0.10.0: the generation of a verdict
+
+`SubmissionVerdictRecorded` carries `rejudgeCount`, the generation the verdict belongs to: the submission's
+`rejudge_count` when it was judged (0 for the first verdict, n after the n-th rejudge), the same number the judging
+topics carry since submission-service SP12. The envelope stays `version: 1`: the field is optional.
+
+```json
+{"submissionId":"…","problemId":"…","verdict":0,"rejudge":true,"userId":"…","contestId":null,
+ "submittedAt":"2026-10-03T09:59:00Z","rejudgeCount":2}
+```
+
+Two verdicts of one submission can reach a consumer in either order: two outbox relay passes send disjoint batches
+at once, and a dead letter can be replayed after a newer rejudge. A consumer keeps the newest generation it applied
+and ignores a verdict of an older one. A verdict without `rejudgeCount` (a producer older than 0.10.0, or a dead
+letter written before it) cannot be ordered and is applied as it arrives.
+
 ## 0.8.1: error codes and log levels
 
 An `AppException` (and so a `RateLimitedException`) answer carries its `ErrorCodeSpec` name as `code`, next to
