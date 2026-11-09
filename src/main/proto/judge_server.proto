@@ -27,8 +27,23 @@ service JudgeServer {
   // DEADLINE_EXCEEDED (client-side): the client's deadline passed while the sandbox judges. The server observes the call's
   // context: when the client goes away it kills the running children, frees the slot and discards the job.
   rpc Judge(JudgeRequest) returns (JudgeResponse);
+  // Judge, streamed: the same request, the same checks and the same status codes, but each case's result is sent as it
+  // is judged (JudgeEvent.case, in finishing order, not bundle order), then exactly one JudgeEvent.done carrying the
+  // whole JudgeResponse the unary call would have returned (its cases in bundle order). A compile error sends only
+  // `done`. A call that fails sends no `done`: the stream ends with the status code instead, and the client must not
+  // use the cases it has seen (the next sandbox judges from scratch). Added 2026-11-08 so the portal can show the test
+  // ladder fill live; `Judge` stays for callers that do not need it (the run lane).
+  rpc JudgeStream(JudgeRequest) returns (stream JudgeEvent);
   // Health and load probe for the worker's sandbox registry.
   rpc Ping(PingRequest) returns (PingResponse);
+}
+
+// One message of a JudgeStream: a case as it finishes, or the final answer.
+message JudgeEvent {
+  oneof event {
+    CaseResult case = 1; // a case just judged; `output` is empty here (it travels once, in `done`)
+    JudgeResponse done = 2; // the last message of the stream
+  }
 }
 
 message JudgeRequest {
